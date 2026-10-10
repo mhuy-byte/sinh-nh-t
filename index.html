@@ -33,16 +33,7 @@
             z-index: 1;
         }
 
-        /* Hiệu ứng nền pháo hoa/đốm sáng bay màn hình chờ */
-        .ambient-sparkles {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 90;
-        }
-
-        /* Màn hình Hộp Quà Mở Đầu */
+        /* Màn hình Hộp Quà Ban Đầu */
         #gift-screen {
             position: absolute;
             top: 0;
@@ -86,14 +77,14 @@
             animation: pulseText 2s infinite alternate;
         }
 
-        /* Tấm Thiệp Sang Trọng & Đặc Sắc */
+        /* Tấm Thiệp Sang Trọng */
         #card-modal {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(2, 1, 6, 0.88);
+            background: rgba(2, 1, 6, 0.9);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -195,6 +186,8 @@
             backdrop-filter: blur(8px);
             font-size: 11px;
             display: none;
+            opacity: 0;
+            transition: opacity 1s ease;
         }
 
         .control-group {
@@ -222,7 +215,7 @@
             accent-color: #ff007f;
         }
 
-        /* Modal hiển thị khi bấm vào hành tinh ảnh trong thiên hà */
+        /* Modal Xem Ảnh & Lời Chúc Chi Tiết trong Thiên Hà */
         #media-modal {
             position: absolute;
             top: 0;
@@ -303,7 +296,7 @@
         </div>
     </div>
 
-    <!-- 2. Tấm Thiệp Ngọt Ngào & Sâu Sắc -->
+    <!-- 2. Tấm Thiệp Ngọt Ngào -->
     <div id="card-modal">
         <div class="card-box">
             <div class="sender-tag">⭐ Minh Huy Gửi Đến Bạn ⭐</div>
@@ -333,7 +326,7 @@
         </div>
     </div>
 
-    <!-- Modal Xem Ảnh & Lời Chúc Chi Tiết trong Thiên Hà -->
+    <!-- Modal Xem Ảnh & Lời Chúc Chi Tiết -->
     <div id="media-modal">
         <div class="media-card">
             <span class="close-btn" onclick="closeMediaModal()">&times;</span>
@@ -345,7 +338,6 @@
     </div>
 
     <script>
-        // Dữ liệu 4 ảnh đã tải lên GitHub (anh.jpg, anh1.jpg, anh2.jpg, anh3.jpg) kèm lời chúc cực hay
         const wishesData = [
             {
                 img: './anh.jpg',
@@ -375,21 +367,35 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        // 1. Mở thiệp khi click hộp quà
+        // Khởi tạo trước 3D ngầm từ đầu để sẵn sàng bay vào
+        init3DScene();
+
         function openGiftCard() {
             document.getElementById('gift-screen').style.opacity = '0';
             document.getElementById('gift-screen').style.visibility = 'hidden';
             document.getElementById('card-modal').classList.add('active');
         }
 
-        // 2. Vào thiên hà 3D hoành tráng bên trong
+        let isFlyingIntoGalaxy = false;
+        let flyProgress = 0;
+
+        // Bấm chuyển vào vũ trụ: Kích hoạt hiệu ứng bay xuyên không gian
         function enterGalaxy() {
-            document.getElementById('card-modal').classList.remove('active');
-            document.getElementById('control-panel').style.display = 'block';
-            init3D();
+            document.getElementById('card-modal').style.opacity = '0';
+            document.getElementById('card-modal').style.visibility = 'hidden';
+            
+            // Bắt đầu hiệu ứng bay camera mượt mà
+            isFlyingIntoGalaxy = true;
+            flyProgress = 0;
+
+            // Hiện bảng điều khiển sau khi bay xong
+            setTimeout(() => {
+                const panel = document.getElementById('control-panel');
+                panel.style.display = 'block';
+                panel.style.opacity = '1';
+            }, 1800);
         }
 
-        // Tạo texture hạt sáng phát quang siêu mịn, nịnh mắt
         function createGlowTexture() {
             const canvas = document.createElement('canvas');
             canvas.width = 64;
@@ -410,14 +416,15 @@
             return texture;
         }
 
-        function init3D() {
+        function init3DScene() {
             const container = document.getElementById('canvas-container');
             
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x020106, 0.01);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 18, 42);
+            // Đặt camera ở xa tít ngoài không gian để chuẩn bị hiệu ứng bay vào
+            camera.position.set(0, 80, 220);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -430,6 +437,7 @@
             controls.dampingFactor = 0.05;
             controls.maxDistance = 100;
             controls.minDistance = 12;
+            controls.enabled = false; // Tắt điều khiển cho đến khi bay xong
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
             scene.add(ambientLight);
@@ -447,7 +455,6 @@
             window.addEventListener('resize', onWindowResize);
             window.addEventListener('click', onDocumentClick);
 
-            // Tùy chỉnh màu sắc trực tiếp trên bảng điều khiển
             document.getElementById('centerColor').addEventListener('input', (e) => {
                 if (heartMesh) heartMesh.material.color.set(e.target.value);
             });
@@ -463,9 +470,8 @@
             animate();
         }
 
-        // Tạo thiên hà vô cùng lớn, rộng và dày đặc hàng vạn chấm sáng mượt mà
         function createMassiveGalaxy(texture) {
-            const count = 16000; // Tăng mạnh số lượng hạt sáng
+            const count = 16000;
             const geometry = new THREE.BufferGeometry();
             const positions = new Float32Array(count * 3);
             const colors = new Float32Array(count * 3);
@@ -510,7 +516,6 @@
             scene.add(galaxyParticles);
         }
 
-        // Trái tim 3D trung tâm lấp lánh rực rỡ
         function createCenterHeart(texture) {
             const count = 2500;
             const geometry = new THREE.BufferGeometry();
@@ -550,11 +555,10 @@
             scene.add(heartMesh);
         }
 
-        // Sắp xếp các ảnh `anh.jpg`, `anh1.jpg`, `anh2.jpg`, `anh3.jpg` xoay tròn đều đặn quanh quỹ đạo
         function createOrbitingPhotos() {
             const loader = new THREE.TextureLoader();
             const total = wishesData.length;
-            const radius = 16; // Bán kính quỹ đạo lớn hơn, không gian thoáng đẹp
+            const radius = 16;
 
             wishesData.forEach((item, idx) => {
                 const angle = (idx / total) * Math.PI * 2;
@@ -562,12 +566,10 @@
                 loader.load(item.img, (texture) => {
                     const group = new THREE.Group();
 
-                    // Vòng viền hành tinh ảnh phát sáng
                     const ringGeo = new THREE.RingGeometry(1.8, 2.0, 32);
                     const ringMat = new THREE.MeshBasicMaterial({ color: 0xff007f, side: THREE.DoubleSide });
                     group.add(new THREE.Mesh(ringGeo, ringMat));
 
-                    // Ảnh tròn bên trong
                     const imgGeo = new THREE.CircleGeometry(1.75, 32);
                     const imgMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
                     const imgMesh = new THREE.Mesh(imgGeo, imgMat);
@@ -590,6 +592,29 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            // Hiệu ứng bay camera xuyên không gian khi bấm nút chuyển vào vũ trụ
+            if (isFlyingIntoGalaxy) {
+                flyProgress += 0.015; // Tốc độ bay
+                if (flyProgress >= 1) {
+                    flyProgress = 1;
+                    isFlyingIntoGalaxy = false;
+                    controls.enabled = true; // Bật cho phép người dùng xoay nhìn tự do sau khi bay đến nơi
+                }
+                // Dùng hàm mượt (EaseOut Cubic) cho camera tiến về vị trí trung tâm (0, 18, 42)
+                const easeProgress = 1 - Math.pow(1 - flyProgress, 3);
+                camera.position.x = 0 + (0 - 0) * easeProgress;
+                camera.position.y = 80 + (18 - 80) * easeProgress;
+                camera.position.z = 220 + (42 - 220) * easeProgress;
+                camera.lookAt(0, 2, 0);
+            } else if (!controls.enabled) {
+                // Khi chưa bay, camera lơ lửng ngắm cảnh ngoài xa
+                const time = Date.now() * 0.0005;
+                camera.position.x = Math.cos(time) * 100;
+                camera.position.z = Math.sin(time) * 100;
+                camera.position.y = 40;
+                camera.lookAt(0, 0, 0);
+            }
+
             if (galaxyParticles) galaxyParticles.rotation.y += 0.001;
             
             if (heartMesh) {
@@ -598,7 +623,6 @@
                 heartMesh.scale.setScalar(1 + Math.sin(time) * 0.09);
             }
 
-            // Quỹ đạo xoay mượt mà của các bức ảnh
             const speed = 0.0018;
             wishesData.forEach(item => {
                 if (item.nodeGroup) {
@@ -609,7 +633,9 @@
                 }
             });
 
-            controls.update();
+            if (controls.enabled) {
+                controls.update();
+            }
             renderer.render(scene, camera);
         }
 
@@ -620,6 +646,8 @@
         }
 
         function onDocumentClick(event) {
+            if (!controls.enabled) return; // Không cho click mở ảnh khi đang bay
+
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
