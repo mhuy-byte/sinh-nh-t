@@ -75,6 +75,7 @@
             text-shadow: 0 0 20px rgba(255, 0, 127, 0.6);
             letter-spacing: 1.5px;
             animation: pulseText 2s infinite alternate;
+            padding: 0 15px;
         }
 
         /* Tấm Thiệp Sang Trọng */
@@ -215,7 +216,7 @@
             accent-color: #ff007f;
         }
 
-        /* Modal Xem Ảnh & Lời Chúc Chi Tiết trong Thiên Hà */
+        /* Modal Xem Ảnh & Lời Chúc Chi Tiết */
         #media-modal {
             position: absolute;
             top: 0;
@@ -367,7 +368,6 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        // Khởi tạo trước 3D ngầm từ đầu để sẵn sàng bay vào
         init3DScene();
 
         function openGiftCard() {
@@ -379,16 +379,13 @@
         let isFlyingIntoGalaxy = false;
         let flyProgress = 0;
 
-        // Bấm chuyển vào vũ trụ: Kích hoạt hiệu ứng bay xuyên không gian
         function enterGalaxy() {
             document.getElementById('card-modal').style.opacity = '0';
             document.getElementById('card-modal').style.visibility = 'hidden';
             
-            // Bắt đầu hiệu ứng bay camera mượt mà
             isFlyingIntoGalaxy = true;
             flyProgress = 0;
 
-            // Hiện bảng điều khiển sau khi bay xong
             setTimeout(() => {
                 const panel = document.getElementById('control-panel');
                 panel.style.display = 'block';
@@ -423,7 +420,6 @@
             scene.fog = new THREE.FogExp2(0x020106, 0.01);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            // Đặt camera ở xa tít ngoài không gian để chuẩn bị hiệu ứng bay vào
             camera.position.set(0, 80, 220);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -437,7 +433,7 @@
             controls.dampingFactor = 0.05;
             controls.maxDistance = 100;
             controls.minDistance = 12;
-            controls.enabled = false; // Tắt điều khiển cho đến khi bay xong
+            controls.enabled = false;
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
             scene.add(ambientLight);
@@ -453,7 +449,36 @@
             createOrbitingPhotos();
 
             window.addEventListener('resize', onWindowResize);
-            window.addEventListener('click', onDocumentClick);
+
+            // Bắt sự kiện chạm / click tương thích hoàn toàn trên điện thoại và máy tính
+            let pointerDownX = 0;
+            let pointerDownY = 0;
+
+            window.addEventListener('pointerdown', (e) => {
+                pointerDownX = e.clientX;
+                pointerDownY = e.clientY;
+            });
+
+            window.addEventListener('pointerup', (e) => {
+                if (!controls.enabled) return;
+
+                const moveX = Math.abs(e.clientX - pointerDownX);
+                const moveY = Math.abs(e.clientY - pointerDownY);
+
+                // Nếu di chuyển ít hơn 10px thì hiểu là chạm/click chọn hành tinh ảnh
+                if (moveX < 10 && moveY < 10) {
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                    raycaster.setFromCamera(mouse, camera);
+                    const intersects = raycaster.intersectObjects(interactiveNodes);
+
+                    if (intersects.length > 0) {
+                        const data = intersects[0].object.userData;
+                        showMediaModal(data);
+                    }
+                }
+            });
 
             document.getElementById('centerColor').addEventListener('input', (e) => {
                 if (heartMesh) heartMesh.material.color.set(e.target.value);
@@ -592,22 +617,19 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // Hiệu ứng bay camera xuyên không gian khi bấm nút chuyển vào vũ trụ
             if (isFlyingIntoGalaxy) {
-                flyProgress += 0.015; // Tốc độ bay
+                flyProgress += 0.015;
                 if (flyProgress >= 1) {
                     flyProgress = 1;
                     isFlyingIntoGalaxy = false;
-                    controls.enabled = true; // Bật cho phép người dùng xoay nhìn tự do sau khi bay đến nơi
+                    controls.enabled = true;
                 }
-                // Dùng hàm mượt (EaseOut Cubic) cho camera tiến về vị trí trung tâm (0, 18, 42)
                 const easeProgress = 1 - Math.pow(1 - flyProgress, 3);
-                camera.position.x = 0 + (0 - 0) * easeProgress;
+                camera.position.x = 0;
                 camera.position.y = 80 + (18 - 80) * easeProgress;
                 camera.position.z = 220 + (42 - 220) * easeProgress;
                 camera.lookAt(0, 2, 0);
             } else if (!controls.enabled) {
-                // Khi chưa bay, camera lơ lửng ngắm cảnh ngoài xa
                 const time = Date.now() * 0.0005;
                 camera.position.x = Math.cos(time) * 100;
                 camera.position.z = Math.sin(time) * 100;
@@ -643,21 +665,6 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function onDocumentClick(event) {
-            if (!controls.enabled) return; // Không cho click mở ảnh khi đang bay
-
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(interactiveNodes);
-
-            if (intersects.length > 0) {
-                const data = intersects[0].object.userData;
-                showMediaModal(data);
-            }
         }
 
         function showMediaModal(data) {
