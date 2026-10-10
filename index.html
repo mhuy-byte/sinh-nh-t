@@ -368,8 +368,6 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        init3DScene();
-
         function openGiftCard() {
             document.getElementById('gift-screen').style.opacity = '0';
             document.getElementById('gift-screen').style.visibility = 'hidden';
@@ -379,10 +377,14 @@
         let isFlyingIntoGalaxy = false;
         let flyProgress = 0;
 
+        // Bấm nút chuyển đến vũ trụ: Ẩn thiệp và kích hoạt hiệu ứng bay vào thiên hà ngay lập tức
         function enterGalaxy() {
             document.getElementById('card-modal').style.opacity = '0';
             document.getElementById('card-modal').style.visibility = 'hidden';
             
+            // Khởi tạo 3D ngay thời điểm bấm chuyển cảnh (tránh lỗi màn hình đen trên điện thoại)
+            init3DScene();
+
             isFlyingIntoGalaxy = true;
             flyProgress = 0;
 
@@ -414,13 +416,15 @@
         }
 
         function init3DScene() {
+            if (renderer) return; // Tránh khởi tạo 2 lần
+
             const container = document.getElementById('canvas-container');
             
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x020106, 0.01);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 80, 220);
+            camera.position.set(0, 120, 260); // Đặt camera ở xa tít để chuẩn bị hiệu ứng lao vút vào
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -433,7 +437,7 @@
             controls.dampingFactor = 0.05;
             controls.maxDistance = 100;
             controls.minDistance = 12;
-            controls.enabled = false;
+            controls.enabled = false; // Tắt điều khiển thủ công khi đang bay chuyển cảnh
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
             scene.add(ambientLight);
@@ -450,7 +454,7 @@
 
             window.addEventListener('resize', onWindowResize);
 
-            // Bắt sự kiện chạm / click tương thích hoàn toàn trên điện thoại và máy tính
+            // Bắt sự kiện chạm / click chọn ảnh mượt mà trên điện thoại và máy tính
             let pointerDownX = 0;
             let pointerDownY = 0;
 
@@ -465,7 +469,6 @@
                 const moveX = Math.abs(e.clientX - pointerDownX);
                 const moveY = Math.abs(e.clientY - pointerDownY);
 
-                // Nếu di chuyển ít hơn 10px thì hiểu là chạm/click chọn hành tinh ảnh
                 if (moveX < 10 && moveY < 10) {
                     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
                     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -617,24 +620,19 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            // Hoạt ảnh chuyển cảnh: Camera lao vút từ xa vào giữa tâm vũ trụ
             if (isFlyingIntoGalaxy) {
-                flyProgress += 0.015;
+                flyProgress += 0.012;
                 if (flyProgress >= 1) {
                     flyProgress = 1;
                     isFlyingIntoGalaxy = false;
-                    controls.enabled = true;
+                    controls.enabled = true; // Mở khóa cho phép xoay màn hình tự do
                 }
                 const easeProgress = 1 - Math.pow(1 - flyProgress, 3);
                 camera.position.x = 0;
-                camera.position.y = 80 + (18 - 80) * easeProgress;
-                camera.position.z = 220 + (42 - 220) * easeProgress;
+                camera.position.y = 120 + (18 - 120) * easeProgress;
+                camera.position.z = 260 + (42 - 260) * easeProgress;
                 camera.lookAt(0, 2, 0);
-            } else if (!controls.enabled) {
-                const time = Date.now() * 0.0005;
-                camera.position.x = Math.cos(time) * 100;
-                camera.position.z = Math.sin(time) * 100;
-                camera.position.y = 40;
-                camera.lookAt(0, 0, 0);
             }
 
             if (galaxyParticles) galaxyParticles.rotation.y += 0.001;
@@ -655,13 +653,16 @@
                 }
             });
 
-            if (controls.enabled) {
+            if (controls && controls.enabled) {
                 controls.update();
             }
-            renderer.render(scene, camera);
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
         }
 
         function onWindowResize() {
+            if (!camera || !renderer) return;
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
